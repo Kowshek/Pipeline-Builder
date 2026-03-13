@@ -18,7 +18,7 @@ export const SubmitButton = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/pipelines/parse', {
+      const response = await fetch('https://pipeline-builder-yy5b.onrender.com/pipelines/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodes, edges }),
