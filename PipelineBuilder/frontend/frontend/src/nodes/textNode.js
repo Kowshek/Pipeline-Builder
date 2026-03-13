@@ -1,109 +1,127 @@
-// frontend/src/nodes/textNode.js
-
-import { useState, useEffect, useRef } from "react";
-import { Position } from "reactflow";
-import { BaseNode } from "./BaseNode";
+// src/nodes/textNode.js
+import { useState, useEffect, useRef } from 'react';
+import { Position } from 'reactflow';
+import { BaseNode } from './baseNode';
 
 export const TextNode = ({ id, data }) => {
-  const [currText, setCurrText] = useState(data?.text || "{{input}}");
-  const [handles, setHandles] = useState([]);
+  const [currText, setCurrText] = useState(data?.text || '{{input}}');
+  const [variables, setVariables] = useState([]);
   const textareaRef = useRef(null);
+  const [dimensions, setDimensions] = useState({ width: 220, height: 'auto' });
 
-  // 1. HELPER: Auto-resize the textarea
+  // Extract {{variable}} names from text
   useEffect(() => {
-    if (textareaRef.current) {
-      // Reset height to shrink if text is deleted
-      textareaRef.current.style.height = "auto";
-      // Set height to scrollHeight to fit content
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [currText]);
-
-  // 2. LOGIC: Extract variables like {{name}} and create handles
-  useEffect(() => {
-    // Regex to find text inside {{ }}
-    const regex = /\{\{(.*?)\}\}/g;
-    const matches = [];
+    const regex = /\{\{([a-zA-Z_$][a-zA-Z0-9_$]*)\}\}/g;
+    const found = [];
     let match;
-
     while ((match = regex.exec(currText)) !== null) {
-      // match[1] contains the text inside brackets (the variable name)
-      // We trim whitespace so "{{ var }}" becomes "var"
-      const varName = match[1].trim();
-      if (varName && !matches.includes(varName)) {
-        matches.push(varName);
+      if (!found.includes(match[1])) {
+        found.push(match[1]);
       }
     }
-
-    // Create a new handle for every unique variable found
-    const newHandles = matches.map((variable, index) => ({
-      id: variable,
-      type: "target",
-      position: Position.Left,
-      // Spacing logic: distribute handles evenly
-      style: { top: `${(index + 1) * (100 / (matches.length + 1))}%` },
-    }));
-
-    // Add the default output handle on the right
-    newHandles.push({
-      id: "output",
-      type: "source",
-      position: Position.Right,
-    });
-
-    setHandles(newHandles);
+    setVariables(found);
   }, [currText]);
 
-  const handleTextChange = (e) => {
-    setCurrText(e.target.value);
-  };
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height =
+        textareaRef.current.scrollHeight + 'px';
+
+      // Auto-expand width based on longest line
+      const lines = currText.split('\n');
+      const maxLength = Math.max(...lines.map((l) => l.length), 10);
+      const newWidth = Math.min(Math.max(220, maxLength * 8 + 40), 500);
+      setDimensions({ width: newWidth });
+    }
+  }, [currText]);
+
+  // Dynamic handles for variables
+  const handles = [
+    // Output handle on right
+    {
+      type: 'source',
+      position: Position.Right,
+      id: `${id}-output`,
+    },
+    // Dynamic variable handles on left
+    ...variables.map((varName, index) => ({
+      type: 'target',
+      position: Position.Left,
+      id: `${id}-${varName}`,
+      style: {
+        top: `${((index + 1) / (variables.length + 1)) * 100}%`,
+      },
+    })),
+  ];
 
   return (
     <BaseNode
       id={id}
-      data={{ label: "Text" }}
-      handles={handles} // Pass our dynamic handles to the BaseNode
+      title="✎ Text"
+      handles={handles}
+      width={dimensions.width}
     >
-      <label
-        style={{
-          display: "block",
-          marginBottom: "5px",
-          color: "#64748b",
-          fontSize: "12px",
-        }}
-      >
+      {/* Show variable labels on left */}
+      {variables.length > 0 && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+          marginBottom: '6px'
+        }}>
+          {variables.map((v, i) => (
+            <span key={v} style={{
+              fontSize: '10px',
+              color: '#a5b4fc',
+              fontWeight: '600',
+              paddingLeft: '4px',
+              borderLeft: '2px solid #6366f1',
+            }}>
+              {`{{ ${v} }}`}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <label style={labelStyle}>
         Text:
         <textarea
           ref={textareaRef}
           value={currText}
-          onChange={handleTextChange}
-          style={{
-            width: "100%",
-            minHeight: "30px",
-            boxSizing: "border-box",
-            resize: "none", // Disable manual resize, we handle it automatically
-            border: "1px solid #cbd5e1",
-            borderRadius: "4px",
-            padding: "4px",
-            fontFamily: "inherit",
-            fontSize: "13px",
-            overflow: "hidden",
-          }}
+          onChange={(e) => setCurrText(e.target.value)}
+          style={textareaStyle}
+          rows={1}
         />
       </label>
-
-      {/* Visual helper to show extracted variables (optional, good for debugging) */}
-      <div style={{ marginTop: "5px", fontSize: "10px", color: "#94a3b8" }}>
-        {handles.length > 1 && (
-          <span>
-            Variables:{" "}
-            {handles
-              .filter((h) => h.id !== "output")
-              .map((h) => h.id)
-              .join(", ")}
-          </span>
-        )}
-      </div>
     </BaseNode>
   );
+};
+
+const labelStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  fontSize: '11px',
+  color: '#a5b4fc',
+  fontWeight: '600',
+};
+
+const textareaStyle = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(99,102,241,0.4)',
+  borderRadius: '6px',
+  padding: '6px 8px',
+  color: '#e2e8f0',
+  fontSize: '12px',
+  outline: 'none',
+  resize: 'none',
+  overflow: 'hidden',
+  fontFamily: 'inherit',
+  lineHeight: '1.5',
+  minHeight: '36px',
+  width: '100%',
+  boxSizing: 'border-box',
+  marginTop: '2px',
 };
